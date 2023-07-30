@@ -18,13 +18,16 @@
     Promise.all([
       d3.csv("https://advaitrs.github.io/state_parties.csv", d3.autoType),
       d3.csv("https://advaitrs.github.io/Population.csv", d3.autoType),
-      d3.csv("https://advaitrs.github.io/us-states.csv", d3.autoType)
-    ]).then(function([statePartiesData, populationData, covidData]) {
+      d3.csv("https://advaitrs.github.io/us-states-2020.csv", d3.autoType),
+      d3.csv("https://advaitrs.github.io/us-states-2021.csv", d3.autoType),
+      d3.csv("https://advaitrs.github.io/us-states-2022.csv", d3.autoType),
+      d3.csv("https://advaitrs.github.io/us-states-2023.csv", d3.autoType)
+    ]).then(function([statePartiesData, populationData, data2020, data2021, data2022, data2023]) {
       // Data is now parsed with appropriate types
       // Show the first slide by default
       showSlide1(statePartiesData);
       showSlide2(populationData);
-      showSlide3(statePartiesData, covidData);
+      showSlide3(data2020, data2021, data2022, data2023);
     }).catch(function(error) {
       console.error("Error loading data:", error);
     });
@@ -162,28 +165,17 @@
     }
 
     // Function for Slide 3 (Simple Bar Chart)
-      function showSlide3(covidData) {
-      // Filter the data to include only the years 2020, 2021, 2022, and 2023
-      const filteredData = covidData.filter(d => {
-        const year = d.Date.getFullYear();
-        return year >= 2020 && year <= 2023;
-      });
-
+    function showSlide3(data2020, data2021, data2022, data2023) {
       // Calculate the total cases for each year
       const totalCasesByYear = {
-        "2020": 0,
-        "2021": 0,
-        "2022": 0,
-        "2023": 0
+        "2020": d3.sum(data2020, d => d.Cases),
+        "2021": d3.sum(data2021, d => d.Cases),
+        "2022": d3.sum(data2022, d => d.Cases),
+        "2023": d3.sum(data2023, d => d.Cases)
       };
 
-      filteredData.forEach(d => {
-        const year = d.Date.getFullYear();
-        totalCasesByYear[year] += +d.Cases;
-      });
-
       // Data for the slide
-      const data = Object.entries(totalCasesByYear).map(([year, cases]) => ({ year, cases }));
+      const data = Object.entries(totalCasesByYear).map(([Date, Cases]) => ({ Date, Cases }));
 
       // Remove any existing SVG elements
       d3.select("#chart").selectAll("svg").remove();
@@ -225,7 +217,6 @@
       // Show the current slide
       d3.select(`#chart > svg:nth-child(${currentSlideIndex + 1})`).style("display", "block");
     }
-
     // Function to go to the next slide
     function nextSlide() {
       currentSlideIndex = (currentSlideIndex + 1) % 3;
