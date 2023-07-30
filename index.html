@@ -129,7 +129,7 @@
         .style("display", "none");
 
       // Extract cases and population data for the correlation plot
-      const correlationData = data.map(d => ({ cases: d.Cases, population: getPopulationByState(d.State, populationData) }));
+      const correlationData = data.map(d => ({ cases: d.Cases, population: getPopulationByState(d.State, populationData), affiliation: d.PartyAffiliation }));
 
       // Calculate correlation coefficient
       const correlation = d3.rollups(correlationData, v => d3.sum(v, d => d.cases * d.population), d => null, d => d.cases, d => d.population)
@@ -153,7 +153,7 @@
         .attr("cx", d => xCorrScale(d.cases))
         .attr("cy", d => yCorrScale(d.population))
         .attr("r", 3)
-        .attr("fill", "black")
+        .attr("fill", d => colorScale(d.affiliation))
         .on("mouseover", function(event, d) {
           showTooltip(`Cases: ${d.cases}, Population: ${d.population}`);
         })
@@ -176,7 +176,8 @@
         .attr("x", width / 2)
         .attr("y", margin.top)
         .attr("text-anchor", "middle")
-        .text(`Correlation: ${correlation.toFixed(2)}`);
+        .text(`COVID-19 Cases and State Population Correlation in ${year}`)
+        .style("font-size", "14px");
 
       // Show the correlation plot for the current year
       if (currentSlideIndex === year - 2020) {
