@@ -1,16 +1,23 @@
-//main.js
+// State Parties Data URL
 const statePartiesURL = "https://advaitrs.github.io/state_parties.csv";
 
-// Load the CSV data using d3.csv
-d3.csv(statePartiesURL, function(data) {
-  // Process the data and display the pie chart
-  showPieChart(data);
-});
+// Function to load CSV data using a Promise-based approach
+const loadData = (url) => {
+  return new Promise((resolve, reject) => {
+    d3.csv(url, (error, data) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+};
 
 // Function to display the pie chart
-function showPieChart(data) {
+const showPieChart = (data) => {
   // Create an array of unique party affiliations and their counts
-  const partyCounts = d3.rollup(data, v => v.length, d => d["Governor Political Affiliation"]);
+  const partyCounts = d3.rollup(data, (v) => v.length, (d) => d["Governor Political Affiliation"]);
 
   // Convert the map to an array of objects
   const partyData = Array.from(partyCounts, ([affiliation, count]) => ({ affiliation, count }));
@@ -28,7 +35,7 @@ function showPieChart(data) {
 
   // Create a pie chart layout
   const pie = d3.pie()
-    .value(d => d.count)
+    .value((d) => d.count)
     .sort(null);
 
   // Define the colors for the pie chart slices
@@ -50,9 +57,9 @@ function showPieChart(data) {
 
   // Add labels to the pie chart slices
   slices.append("text")
-    .attr("transform", d => `translate(${arc.centroid(d)})`)
+    .attr("transform", (d) => `translate(${arc.centroid(d)})`)
     .attr("text-anchor", "middle")
-    .text(d => d.data.affiliation);
+    .text((d) => d.data.affiliation);
 
   // Add a title to the pie chart
   svg.append("text")
@@ -60,4 +67,9 @@ function showPieChart(data) {
     .attr("y", 20)
     .attr("text-anchor", "middle")
     .text("Governor Party Affiliation Pie Chart");
-}
+};
+
+// Call the function to load the CSV data and display the pie chart
+loadData(statePartiesURL)
+  .then((data) => showPieChart(data))
+  .catch((error) => console.error("Error loading State Parties Data:", error));
