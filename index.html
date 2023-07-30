@@ -5,14 +5,22 @@
   <script src="https://d3js.org/d3.v6.min.js"></script>
 </head>
 <body>
+  <div>
+    <select id="partyFilter" onchange="filterData()">
+      <option value="all">All</option>
+      <option value="Democratic">Democratic</option>
+      <option value="Republican">Republican</option>
+    </select>
+  </div>
   <div id="chart"></div>
   <div id="tooltip" style="position: absolute; visibility: hidden; padding: 8px; background-color: rgba(0, 0, 0, 0.8); color: #fff;"></div>
   <button onclick="previousSlide()">Previous</button>
   <button onclick="nextSlide()">Next</button>
   <button onclick="goToStart()">Go Back to Start</button>
   <script>
-    // Global variables to track the current slide index
+    // Global variables to track the current slide index and party filter
     let currentSlideIndex = 0;
+    let partyFilter = "all";
 
     // Load the CSV data using d3.csv with d3.autoType
     Promise.all([
@@ -46,16 +54,29 @@
       tooltip.style("visibility", "hidden");
     }
 
+    // Function to filter data based on the selected party affiliation
+    function filterData() {
+      partyFilter = d3.select("#partyFilter").node().value;
+      showCurrentSlide();
+    }
+
     // Function to show a slide for a specific year
     function showSlide(data, partiesData, populationData, year) {
+      // Filter data based on the selected party affiliation
+      let filteredData = data;
+      if (partyFilter !== "all") {
+        filteredData = data.filter(d => d.PartyAffiliation === partyFilter);
+      }
 
       // Add party affiliation information to the data
-      data.forEach(d => {
+      filteredData.forEach(d => {
         const partyInfo = partiesData.find(p => p.State === d.State);
         if (partyInfo) {
           d.PartyAffiliation = partyInfo["Governor Political Affiliation"];
         }
       });
+
+      // Rest of the code remains the same...
 
       // Width and height of the chart
       const width = 600;
@@ -77,17 +98,17 @@
 
       // Create scales for the bar chart
       const xScale = d3.scaleBand()
-        .domain(data.map(d => d.State))
+        .domain(filteredData.map(d => d.State))
         .range([0, chartWidth])
         .padding(0.1);
 
       const yScale = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d.Cases)])
+        .domain([0, d3.max(filteredData, d => d.Cases)])
         .range([chartHeight, 0]);
 
       // Create bars for the bar chart
       svg.selectAll("rect")
-        .data(data)
+        .data(filteredData)
         .enter()
         .append("rect")
         .attr("x", d => xScale(d.State))
@@ -108,7 +129,8 @@
         .call(d3.axisBottom(xScale))
         .selectAll("text")
         .attr("transform", "rotate(-45)")
-        .style("text-anchor", "end");
+        .style("text-anchor", "end")
+        .style("font-size", "12px");
 
       // Add y-axis for the bar chart
       svg.append("g")
@@ -121,6 +143,20 @@
         .attr("text-anchor", "middle")
         .text(`COVID-19 Cases by State in ${year}`);
 
+      // Add axis labels for the bar chart
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height - margin.bottom / 4)
+        .attr("text-anchor", "middle")
+        .text("State Name");
+        
+      svg.append("text")
+        .attr("x", -height / 6)
+        .attr("y", margin.left / 6)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("COVID-19 Cases");
+
       // Create an SVG container for the correlation plot
       const corrSvg = d3.select("#chart")
         .append("svg")
@@ -129,7 +165,7 @@
         .style("display", "none");
 
       // Extract cases and population data for the correlation plot
-      const correlationData = data.map(d => ({ cases: d.Cases, population: getPopulationByState(d.State, populationData), affiliation: d.PartyAffiliation }));
+      const correlationData = filteredData.map(d => ({ cases: d.Cases, population: getPopulationByState(d.State, populationData), affiliation: d.PartyAffiliation }));
 
       // Calculate correlation coefficient
       const correlation = d3.rollups(correlationData, v => d3.sum(v, d => d.cases * d.population), d => null, d => d.cases, d => d.population)
@@ -171,13 +207,27 @@
         .attr("transform", `translate(${margin.left}, 0)`)
         .call(d3.axisLeft(yCorrScale));
 
-      // Add correlation coefficient text
+      // Add a title for the correlation plot
       corrSvg.append("text")
         .attr("x", width / 2)
         .attr("y", margin.top)
         .attr("text-anchor", "middle")
         .text(`COVID-19 Cases and State Population Correlation in ${year}`)
         .style("font-size", "14px");
+
+      // Add axis labels for the correlation plot
+      corrSvg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height - 110)
+        .attr("text-anchor", "middle")
+        .text("COVID-19 Cases");
+
+      corrSvg.append("text")
+        .attr("x", -height/2)
+        .attr("y", margin.left / 6)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("State Population");
 
       // Show the correlation plot for the current year
       if (currentSlideIndex === year - 2020) {
@@ -224,3 +274,5 @@
   </script>
 </body>
 </html>
+
+
