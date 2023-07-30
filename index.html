@@ -1,19 +1,11 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <title>Test CSV Data Loading with D3</title>
-    <script src="https://d3js.org/d3.v6.min.js"></script>
+  <title>State Parties Pie Chart</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
 </head>
 <body>
-    <script>
-        // State Parties Data URL
-        const statePartiesURL = "https://advaitrs.github.io/state_parties.csv";
-
-        // Load the CSV data using d3.csv
-        d3.csv(statePartiesURL, function (data) {
-            // Log the first row of the loaded data to the console
-            console.log(data[0]);
-        });
-    </script>
+  <div id="chart"></div>
+  <script src="main.js"></script>
 </body>
 </html>
