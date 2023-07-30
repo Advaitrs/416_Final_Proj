@@ -45,8 +45,17 @@
     function showTooltip(content) {
       const tooltip = d3.select("#tooltip");
       tooltip.text(content);
+      
+      // Get the mouse pointer's coordinates
+      const [mouseX, mouseY] = d3.pointer(event);
+
+      // Update the position of the tooltip
+      tooltip.style("left", `${mouseX + 10}px`);
+      tooltip.style("top", `${mouseY + 10}px`);
+      
       tooltip.style("visibility", "visible");
     }
+
 
     // Function to hide tooltip
     function hideTooltip() {
@@ -191,7 +200,7 @@
         .attr("r", 3)
         .attr("fill", d => colorScale(d.affiliation))
         .on("mouseover", function(event, d) {
-          showTooltip(`Cases: ${d.cases}, Population: ${d.population}`);
+          showTooltip(`Cases: ${d.cases}, Population: ${d.population}, State: ${d.State}`);
         })
         .on("mouseout", function() {
           hideTooltip();
@@ -222,12 +231,19 @@
         .attr("text-anchor", "middle")
         .text("COVID-19 Cases");
 
-      corrSvg.append("text")
-        .attr("x", -height/2)
-        .attr("y", margin.left / 6)
+      svg.append("text")
+        .attr("x", width/2)
+        .attr("y", 50)
         .attr("text-anchor", "middle")
-        .attr("transform", "rotate(-90)")
-        .text("State Population");
+        .attr("transform", "rotate(0)")
+        .text("Click through the next and previous buttons to see the Covid-19 case growth through the years ");
+
+        svg.append("text")
+        .attr("x", width/2)
+        .attr("y", 60)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(0)")
+        .text("and also notice the State majority party marked by Red (Republican) and Blue(Democrat)");
 
       // Show the correlation plot for the current year
       if (currentSlideIndex === year - 2020) {
@@ -274,5 +290,4 @@
   </script>
 </body>
 </html>
-
 
