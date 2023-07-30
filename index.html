@@ -1,34 +1,53 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-  <title>State Population Pie Chart</title>
+  <title>Narrative Slideshow</title>
   <script src="https://d3js.org/d3.v6.min.js"></script>
 </head>
 <body>
   <div id="chart"></div>
   <div id="tooltip" style="position: absolute; visibility: hidden; padding: 8px; background-color: rgba(0, 0, 0, 0.8); color: #fff;"></div>
+  <button onclick="previousSlide()">Previous</button>
+  <button onclick="nextSlide()">Next</button>
+  <button onclick="goToStart()">Go Back to Start</button>
   <script>
+    // Global variables to track the current slide index
+    let currentSlideIndex = 0;
+
     // Load the CSV data using d3.csv with d3.autoType
     Promise.all([
       d3.csv("https://advaitrs.github.io/state_parties.csv", d3.autoType),
       d3.csv("https://advaitrs.github.io/Population.csv", d3.autoType)
     ]).then(function([statePartiesData, populationData]) {
       // Data is now parsed with appropriate types
-      showPieChart(statePartiesData, populationData);
+      // Show the first slide by default
+      showSlide1(statePartiesData);
+      showSlide2(populationData);
+      showSlide3(statePartiesData, populationData);
     }).catch(function(error) {
       console.error("Error loading data:", error);
     });
 
-    // Function to display the pie chart
-    function showPieChart(statePartiesData, populationData) {
+    // Function to show tooltip
+    function showTooltip(content) {
+      const tooltip = d3.select("#tooltip");
+      tooltip.text(content);
+      tooltip.style("visibility", "visible");
+    }
+
+    // Function to hide tooltip
+    function hideTooltip() {
+      const tooltip = d3.select("#tooltip");
+      tooltip.style("visibility", "hidden");
+    }
+
+    // Function to show slide 1 (Pie Chart)
+    function showSlide1(data) {
       // Create an array of unique party affiliations and their counts
-      const partyCounts = d3.rollup(statePartiesData, (v) => v.length, (d) => d["Governor Political Affiliation"]);
+      const partyCounts = d3.rollup(data, (v) => v.length, (d) => d["Governor Political Affiliation"]);
 
       // Convert the map to an array of objects
       const partyData = Array.from(partyCounts, ([affiliation, count]) => ({ affiliation, count }));
-
-      // Create an array of state populations
-      const statePopulations = populationData.map((d) => d.Population);
 
       // Width and height of the chart
       const width = 400;
@@ -41,99 +60,232 @@
         .attr("width", width)
         .attr("height", height);
 
-      // Create a pie chart layout for party affiliations
+      // Create a pie chart layout
       const pie = d3.pie()
         .value((d) => d.count)
         .sort(null);
 
-      // Create the arc generator for party affiliations
+      // Create the arc generator
       const arc = d3.arc()
         .innerRadius(0)
         .outerRadius(Math.min(width, height) / 2 - 50);
 
-      // Create the pie chart slices for party affiliations
-      const partySlices = svg.selectAll(".party-slice")
+      // Create the pie chart slices
+      const slices = svg.selectAll(".slice")
         .data(pie(partyData))
         .enter()
         .append("g")
-        .attr("class", "party-slice")
-        .attr("transform", `translate(${width / 4}, ${height / 2})`)
+        .attr("class", "slice")
+        .attr("transform", `translate(${width / 2}, ${height / 2})`)
         .on("mouseover", function(event, d) {
-          showTooltip(d.data.affiliation);
+          showTooltip(`${d.data.affiliation}: ${d.data.count}`);
         })
         .on("mouseout", function() {
           hideTooltip();
         });
 
-      partySlices.append("path")
+      slices.append("path")
         .attr("d", arc)
         .attr("fill", (d, i) => d3.schemeCategory10[i]);
 
-      partySlices.append("text")
+      slices.append("text")
         .attr("transform", (d) => `translate(${arc.centroid(d)})`)
         .attr("text-anchor", "middle")
         .text((d) => d.data.affiliation);
 
-      // Create a pie chart layout for state populations
-      const piePopulation = d3.pie()
-        .value((d) => d)
-        .sort(null);
+      // Add a title
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 30)
+        .attr("text-anchor", "middle")
+        .text("Governor Political Affiliation Pie Chart");
+    }
 
-      // Create the arc generator for state populations
-      const arcPopulation = d3.arc()
-        .innerRadius(0)
-        .outerRadius(Math.min(width, height) / 2 - 50);
+    // Function to show slide 2 (Bar Chart)
+    function showSlide2(data) {
+      // Create a bar chart to show the total population of each state
+      const width = 400;
+      const height = 400;
 
-      // Create the pie chart slices for state populations
-      const populationSlices = svg.selectAll(".population-slice")
-        .data(piePopulation(statePopulations))
+      const svg = d3.select("#chart").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      // Create scales
+      const xScale = d3.scaleBand()
+        .domain(data.map((d) => d.State))
+        .range([0, width])
+        .padding(0.1);
+
+      const yScale = d3.scaleLinear()
+        .domain([0, d3.max(data, (d) => d.Population)])
+        .range([height, 0]);
+
+      // Create bars
+      svg.selectAll("rect")
+        .data(data)
         .enter()
-        .append("g")
-        .attr("class", "population-slice")
-        .attr("transform", `translate(${width * 3 / 4}, ${height / 2})`)
+        .append("rect")
+        .attr("x", (d) => xScale(d.State))
+        .attr("y", (d) => yScale(d.Population))
+        .attr("width", xScale.bandwidth())
+        .attr("height", (d) => height - yScale(d.Population))
+        .attr("fill", "steelblue")
         .on("mouseover", function(event, d) {
-          showTooltip(`Population: ${d.data}`);
+          showTooltip(`State: ${d.State}, Population: ${d.Population}`);
         })
         .on("mouseout", function() {
           hideTooltip();
         });
 
-      populationSlices.append("path")
-        .attr("d", arcPopulation)
-        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+      // Add x-axis
+      svg.append("g")
+        .attr("transform", `translate(0, ${height})`)
+        .call(d3.axisBottom(xScale));
 
-      populationSlices.append("text")
-        .attr("transform", (d) => `translate(${arcPopulation.centroid(d)})`)
-        .attr("text-anchor", "middle")
-        .text((d) => d.data);
+      // Add y-axis
+      svg.append("g")
+        .call(d3.axisLeft(yScale));
 
-      // Add a title for party affiliations
+      // Add a title
       svg.append("text")
-        .attr("x", width / 4)
-        .attr("y", 20)
+        .attr("x", width / 2)
+        .attr("y", 30)
         .attr("text-anchor", "middle")
-        .text("Governor Political Affiliation Pie Chart");
-
-      // Add a title for state populations
-      svg.append("text")
-        .attr("x", width * 3 / 4)
-        .attr("y", 20)
-        .attr("text-anchor", "middle")
-        .text("State Population Pie Chart");
-
-      // Function to show tooltip
-      function showTooltip(content) {
-        const tooltip = d3.select("#tooltip");
-        tooltip.text(content);
-        tooltip.style("visibility", "visible");
-      }
-
-      // Function to hide tooltip
-      function hideTooltip() {
-        const tooltip = d3.select("#tooltip");
-        tooltip.style("visibility", "hidden");
-      }
+        .text("State Population Bar Chart");
     }
+
+    function parseDate(d) {
+      const format = d3.timeFormat("%m/%d/%Y");
+      return {
+        Date: d3.timeParse("%m/%d/%Y")(d.Date),
+        State: d.State,
+        Cases: +d.Cases,
+        Deaths: +d.Deaths
+      };
+    }
+
+    function parseDate(d) {
+      const format = d3.timeFormat("%m/%d/%Y");
+      return {
+        Date: d3.timeParse("%m/%d/%Y")(d.Date),
+        State: d.State,
+        Cases: +d.Cases,
+        Deaths: +d.Deaths
+      };
+    }
+
+    // Function for Slide 3 (Simple Bar Chart)
+    function showSlide3(statePartiesData, covidData) {
+      // Filter the data to include only the years 2020, 2021, 2022, and 2023
+      const filteredData = covidData.filter(d => {
+        const year = d.Date.getFullYear();
+        return year >= 2020 && year <= 2023;
+      });
+
+      // Calculate the total cases for each year
+      const totalCasesByYear = {
+        "2020": 0,
+        "2021": 0,
+        "2022": 0,
+        "2023": 0
+      };
+
+      filteredData.forEach(d => {
+        const year = d.Date.getFullYear();
+        totalCasesByYear[year] += +d.Cases;
+      });
+
+      // Data for the bar chart
+      const data = Object.entries(totalCasesByYear).map(([year, cases]) => ({ year, cases }));
+
+      // Width and height of the chart
+      const width = 400;
+      const height = 300;
+      const margin = { top: 20, right: 20, bottom: 30, left: 40 };
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+
+      // Create an SVG container
+      const svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      // Create a group for the chart
+      const chart = svg.append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+      // Create scales
+      const xScale = d3.scaleBand()
+        .domain(data.map(d => d.year))
+        .range([0, chartWidth])
+        .padding(0.1);
+
+      const yScale = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.cases)])
+        .range([chartHeight, 0]);
+
+      // Create bars
+      chart.selectAll(".bar")
+        .data(data)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", d => xScale(d.year))
+        .attr("y", d => yScale(d.cases))
+        .attr("width", xScale.bandwidth())
+        .attr("height", d => chartHeight - yScale(d.cases))
+        .attr("fill", "steelblue");
+
+      // Add x-axis
+      const xAxis = d3.axisBottom(xScale);
+      chart.append("g")
+        .attr("transform", `translate(0, ${chartHeight})`)
+        .call(xAxis);
+
+      // Add y-axis
+      const yAxis = d3.axisLeft(yScale);
+      chart.append("g")
+        .call(yAxis);
+
+      // Add a title
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 30)
+        .attr("text-anchor", "middle")
+        .text("Total COVID-19 Cases by Year (2020-2023)");
+    }
+
+    // Function to show the current slide based on the index
+    function showCurrentSlide() {
+      // Hide all slides
+      d3.selectAll("#chart > svg").style("display", "none");
+
+      // Show the current slide
+      d3.select(`#chart > svg:nth-child(${currentSlideIndex + 1})`).style("display", "block");
+    }
+
+    // Function to go to the next slide
+    function nextSlide() {
+      currentSlideIndex = (currentSlideIndex + 1) % 3;
+      showCurrentSlide();
+    }
+
+    // Function to go to the previous slide
+    function previousSlide() {
+      currentSlideIndex = (currentSlideIndex - 1 + 3) % 3;
+      showCurrentSlide();
+    }
+
+    // Function to go back to the start
+    function goToStart() {
+      currentSlideIndex = 0;
+      showCurrentSlide();
+    }
+
+    // Call showCurrentSlide to display the first slide on load
+    showCurrentSlide();
   </script>
 </body>
 </html>
