@@ -1,14 +1,11 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <title>State and COVID Data Visualization</title>
+    <title>Total COVID Cases per Year</title>
     <script src="https://d3js.org/d3.v6.min.js"></script>
 </head>
 <body>
     <div id="chart"></div>
-    <button id="previousBtn">Previous</button>
-    <button id="nextBtn">Next</button>
-    <button id="backToStartBtn">Go Back to Start</button>
     <script>
         // Width and height of the chart
         const width = 600;
@@ -37,222 +34,62 @@
             });
         };
 
-        // Function to load and display US States COVID Data
-        const showUSStatesCovidData = async () => {
+        // Function to load and display the simple bar chart
+        const showSimpleBarChart = async () => {
             try {
                 const csvData = await loadData(usStatesCovidURL);
-                showSlide1(csvData);
-                showSlide2(csvData);
-                showSlide3(csvData);
+
+                // Parse the date string to extract the year
+                const parseDate = d3.timeParse("%Y-%m-%d");
+                csvData.forEach((d) => {
+                    d.Year = parseDate(d.Date).getFullYear();
+                });
+
+                // Group data by year and calculate the total cases for each year
+                const casesByYear = d3.group(csvData, (d) => d.Year);
+                const totalCasesByYear = Array.from(casesByYear, ([year, cases]) => ({
+                    Year: year,
+                    TotalCases: d3.sum(cases, (d) => +d.Cases),
+                }));
+
+                // Create scales
+                const xScale = d3.scaleBand()
+                    .domain(totalCasesByYear.map((d) => d.Year))
+                    .range([0, width])
+                    .padding(0.1);
+
+                const yScale = d3.scaleLinear()
+                    .domain([0, d3.max(totalCasesByYear, (d) => d.TotalCases)])
+                    .range([height, 0]);
+
+                // Create bars
+                const bars = svg.selectAll("rect")
+                    .data(totalCasesByYear)
+                    .enter()
+                    .append("rect")
+                    .attr("x", (d) => xScale(d.Year))
+                    .attr("y", (d) => yScale(d.TotalCases))
+                    .attr("width", xScale.bandwidth())
+                    .attr("height", (d) => height - yScale(d.TotalCases))
+                    .attr("fill", "steelblue");
+
+                // Add axes
+                const xAxis = d3.axisBottom(xScale);
+                const yAxis = d3.axisLeft(yScale);
+
+                svg.append("g")
+                    .attr("transform", `translate(0, ${height})`)
+                    .call(xAxis);
+
+                svg.append("g")
+                    .call(yAxis);
             } catch (error) {
                 console.error("Error loading US States COVID Data:", error);
             }
         };
 
-        // Slide 1: Bar Chart - Displaying total COVID cases for each state over time
-        const showSlide1 = (csvData) => {
-            // Extract unique states
-            const states = Array.from(new Set(csvData.map((d) => d.State)));
-
-            // Group data by state and date
-            const stateData = states.map((state) => {
-                return {
-                    state: state,
-                    data: csvData.filter((d) => d.State === state),
-                };
-            });
-
-            // Create scales
-            const xScale = d3.scaleBand()
-                .domain(csvData.map((d) => d.Date))
-                .range([0, width])
-                .padding(0.1);
-
-            const yScale = d3.scaleLinear()
-                .domain([0, d3.max(csvData, (d) => +d.Cases)])
-                .range([height, 0]);
-
-            // Create bars
-            const bars = svg.selectAll("rect")
-                .data(stateData)
-                .enter()
-                .append("g")
-                .attr("transform", (d) => `translate(${xScale(d.data[0].Date)}, 0)`)
-                .selectAll("rect")
-                .data((d) => d.data)
-                .enter()
-                .append("rect")
-                .attr("x", 0)
-                .attr("y", (d) => yScale(+d.Cases))
-                .attr("width", xScale.bandwidth())
-                .attr("height", (d) => height - yScale(+d.Cases))
-                .attr("fill", "steelblue");
-
-            // Add axes
-            const xAxis = d3.axisBottom(xScale);
-            const yAxis = d3.axisLeft(yScale);
-
-            svg.append("g")
-                .attr("transform", `translate(0, ${height})`)
-                .call(xAxis);
-
-            svg.append("g")
-                .call(yAxis);
-        };
-
-        // Slide 2: Stacked Bar Chart - Dividing COVID cases into confirmed, deaths, and recovered cases for each state
-        const showSlide2 = (csvData) => {
-            // Extract unique states
-            const states = Array.from(new Set(csvData.map((d) => d.State)));
-
-            // Group data by state
-            const stateData = states.map((state) => {
-                const filteredData = csvData.filter((d) => d.State === state);
-                return {
-                    state: state,
-                    confirmed: d3.sum(filteredData, (d) => +d.Cases),
-                    deaths: d3.sum(filteredData, (d) => +d.Deaths),
-                    recovered: d3.sum(filteredData, (d) => +d.Recovered),
-                };
-            });
-
-            // Create scales
-            const xScale = d3.scaleBand()
-                .domain(states)
-                .range([0, width])
-                .padding(0.1);
-
-            const yScale = d3.scaleLinear()
-                .domain([0, d3.max(stateData, (d) => d.confirmed)])
-                .range([height, 0]);
-
-            // Create stacked bars
-            const bars = svg.selectAll("g")
-                .data(stateData)
-                .enter()
-                .append("g")
-                .attr("transform", (d) => `translate(${xScale(d.state)}, 0)`);
-
-            bars.append("rect")
-                .attr("x", 0)
-                .attr("y", (d) => yScale(d.confirmed))
-                .attr("width", xScale.bandwidth())
-                .attr("height", (d) => height - yScale(d.confirmed))
-                .attr("fill", "steelblue");
-
-            bars.append("rect")
-                .attr("x", 0)
-                .attr("y", (d) => yScale(d.deaths))
-                .attr("width", xScale.bandwidth())
-                .attr("height", (d) => yScale(d.confirmed) - yScale(d.deaths))
-                .attr("fill", "red");
-
-            bars.append("rect")
-                .attr("x", 0)
-                .attr("y", (d) => yScale(d.recovered))
-                .attr("width", xScale.bandwidth())
-                .attr("height", (d) => yScale(d.deaths) - yScale(d.recovered))
-                .attr("fill", "green");
-
-            // Add axes
-            const xAxis = d3.axisBottom(xScale);
-            const yAxis = d3.axisLeft(yScale);
-
-            svg.append("g")
-                .attr("transform", `translate(0, ${height})`)
-                .call(xAxis);
-
-            svg.append("g")
-                .call(yAxis);
-        };
-
-        // Slide 3: Scatter Plot - Displaying the relationship between COVID cases and deaths for each state
-        const showSlide3 = async (covidData) => {
-            // Load the state_parties.csv dataset
-            const statePartiesURL = "https://advaitrs.github.io/state_parties.csv";
-            const statePartiesData = await loadData(statePartiesURL);
-
-            // Merge the datasets using the "State" column as the key
-            const mergedData = covidData.map((d) => {
-                const statePartyData = statePartiesData.find((s) => s.State === d.State);
-                return {
-                    ...d,
-                    "Governor Political Affiliation": statePartyData ? statePartyData["Governor Political Affiliation"] : "Unknown",
-                };
-            });
-
-            // Create scales
-            const xScale = d3.scaleLinear()
-                .domain([0, d3.max(mergedData, (d) => +d.Cases)])
-                .range([0, width]);
-
-            const yScale = d3.scaleLinear()
-                .domain([0, d3.max(mergedData, (d) => +d.Deaths)])
-                .range([height, 0]);
-
-            // Create circles with colors based on Governor's political affiliation
-            svg.selectAll("circle")
-                .data(mergedData)
-                .enter()
-                .append("circle")
-                .attr("cx", (d) => xScale(+d.Cases))
-                .attr("cy", (d) => yScale(+d.Deaths))
-                .attr("r", 5)
-                .attr("fill", (d) => (d["Governor Political Affiliation"] === "Democrat" ? "blue" : "red"))
-                .attr("opacity", 0.7);
-
-            // Add axes
-            const xAxis = d3.axisBottom(xScale);
-            const yAxis = d3.axisLeft(yScale);
-
-            svg.append("g")
-                .attr("transform", `translate(0, ${height})`)
-                .call(xAxis);
-
-            svg.append("g")
-                .call(yAxis);
-        };
-
-        // Rest of the D3.js code...
-
-        // Handle "Next" button click
-        document.getElementById("nextBtn").addEventListener("click", () => {
-            if (currentIndex < data.length && data) {
-                showAnnotation(data[currentIndex]);
-                currentIndex++;
-            }
-        });
-
-        // Handle "Previous" button click
-        document.getElementById("previousBtn").addEventListener("click", () => {
-            if (currentIndex > 0 && data) {
-                currentIndex--;
-                svg.selectAll("circle").remove();
-                svg.selectAll("rect").remove();
-                showSlide1(data);
-                showSlide2(data);
-                showSlide3(data);
-                for (let i = 0; i < currentIndex; i++) {
-                    showAnnotation(data[i]);
-                }
-            }
-        });
-
-        // Handle "Go Back to Start" button click
-        document.getElementById("backToStartBtn").addEventListener("click", () => {
-            currentIndex = 0;
-            svg.selectAll("circle").remove();
-            svg.selectAll("rect").remove();
-            showSlide1(data);
-            showSlide2(data);
-            showSlide3(data);
-        });
-
-        // Call the function to display the intro text initially
-        showIntro();
-
-        // Call the function to load and display US States COVID Data when the page loads
-        showUSStatesCovidData();
+        // Call the function to load and display the simple bar chart when the page loads
+        showSimpleBarChart();
 
     </script>
 </body>
