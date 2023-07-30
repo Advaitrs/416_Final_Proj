@@ -1,29 +1,34 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-  <title>State Parties Pie Chart</title>
+  <title>State Population Pie Chart</title>
   <script src="https://d3js.org/d3.v6.min.js"></script>
 </head>
 <body>
   <div id="chart"></div>
+  <div id="tooltip" style="position: absolute; visibility: hidden; padding: 8px; background-color: rgba(0, 0, 0, 0.8); color: #fff;"></div>
   <script>
     // Load the CSV data using d3.csv with d3.autoType
-    d3.csv("https://advaitrs.github.io/state_parties.csv", d3.autoType)
-      .then(function(data) {
-        // Data is now parsed with appropriate types
-        showPieChart(data);
-      })
-      .catch(function(error) {
-        console.error("Error loading State Parties Data:", error);
-      });
+    Promise.all([
+      d3.csv("https://advaitrs.github.io/state_parties.csv", d3.autoType),
+      d3.csv("https://advaitrs.github.io/Population.csv", d3.autoType)
+    ]).then(function([statePartiesData, populationData]) {
+      // Data is now parsed with appropriate types
+      showPieChart(statePartiesData, populationData);
+    }).catch(function(error) {
+      console.error("Error loading data:", error);
+    });
 
     // Function to display the pie chart
-    function showPieChart(data) {
+    function showPieChart(statePartiesData, populationData) {
       // Create an array of unique party affiliations and their counts
-      const partyCounts = d3.rollup(data, (v) => v.length, (d) => d["Governor Political Affiliation"]);
+      const partyCounts = d3.rollup(statePartiesData, (v) => v.length, (d) => d["Governor Political Affiliation"]);
 
       // Convert the map to an array of objects
       const partyData = Array.from(partyCounts, ([affiliation, count]) => ({ affiliation, count }));
+
+      // Create an array of state populations
+      const statePopulations = populationData.map((d) => d.Population);
 
       // Width and height of the chart
       const width = 400;
@@ -36,40 +41,98 @@
         .attr("width", width)
         .attr("height", height);
 
-      // Create a pie chart layout
+      // Create a pie chart layout for party affiliations
       const pie = d3.pie()
         .value((d) => d.count)
         .sort(null);
 
-      // Define the colors for the pie chart slices
-      const color = d3.scaleOrdinal(d3.schemeCategory10);
-
-      // Define the arc generator for the pie chart
+      // Create the arc generator for party affiliations
       const arc = d3.arc()
         .innerRadius(0)
-        .outerRadius(Math.min(width, height) / 2 - 1);
+        .outerRadius(Math.min(width, height) / 2 - 50);
 
-      // Create the pie chart slices
-      const slices = svg.selectAll("path")
+      // Create the pie chart slices for party affiliations
+      const partySlices = svg.selectAll(".party-slice")
         .data(pie(partyData))
         .enter()
-        .append("path")
-        .attr("d", arc)
-        .attr("fill", (d, i) => color(i))
-        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+        .append("g")
+        .attr("class", "party-slice")
+        .attr("transform", `translate(${width / 4}, ${height / 2})`)
+        .on("mouseover", function(event, d) {
+          showTooltip(d.data.affiliation);
+        })
+        .on("mouseout", function() {
+          hideTooltip();
+        });
 
-      // Add labels to the pie chart slices
-      slices.append("text")
+      partySlices.append("path")
+        .attr("d", arc)
+        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+      partySlices.append("text")
         .attr("transform", (d) => `translate(${arc.centroid(d)})`)
         .attr("text-anchor", "middle")
         .text((d) => d.data.affiliation);
 
-      // Add a title to the pie chart
+      // Create a pie chart layout for state populations
+      const piePopulation = d3.pie()
+        .value((d) => d)
+        .sort(null);
+
+      // Create the arc generator for state populations
+      const arcPopulation = d3.arc()
+        .innerRadius(0)
+        .outerRadius(Math.min(width, height) / 2 - 50);
+
+      // Create the pie chart slices for state populations
+      const populationSlices = svg.selectAll(".population-slice")
+        .data(piePopulation(statePopulations))
+        .enter()
+        .append("g")
+        .attr("class", "population-slice")
+        .attr("transform", `translate(${width * 3 / 4}, ${height / 2})`)
+        .on("mouseover", function(event, d) {
+          showTooltip(`Population: ${d.data}`);
+        })
+        .on("mouseout", function() {
+          hideTooltip();
+        });
+
+      populationSlices.append("path")
+        .attr("d", arcPopulation)
+        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+      populationSlices.append("text")
+        .attr("transform", (d) => `translate(${arcPopulation.centroid(d)})`)
+        .attr("text-anchor", "middle")
+        .text((d) => d.data);
+
+      // Add a title for party affiliations
       svg.append("text")
-        .attr("x", width / 2)
+        .attr("x", width / 4)
         .attr("y", 20)
         .attr("text-anchor", "middle")
         .text("Governor Political Affiliation Pie Chart");
+
+      // Add a title for state populations
+      svg.append("text")
+        .attr("x", width * 3 / 4)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .text("State Population Pie Chart");
+
+      // Function to show tooltip
+      function showTooltip(content) {
+        const tooltip = d3.select("#tooltip");
+        tooltip.text(content);
+        tooltip.style("visibility", "visible");
+      }
+
+      // Function to hide tooltip
+      function hideTooltip() {
+        const tooltip = d3.select("#tooltip");
+        tooltip.style("visibility", "hidden");
+      }
     }
   </script>
 </body>
