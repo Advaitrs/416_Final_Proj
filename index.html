@@ -20,14 +20,15 @@
       d3.csv("https://advaitrs.github.io/us-states-2021.csv", d3.autoType),
       d3.csv("https://advaitrs.github.io/us-states-2022.csv", d3.autoType),
       d3.csv("https://advaitrs.github.io/us-states-2023.csv", d3.autoType),
-      d3.csv("https://advaitrs.github.io/state_parties.csv", d3.autoType)
-    ]).then(function([data2020, data2021, data2022, data2023, partiesData]) {
+      d3.csv("https://advaitrs.github.io/state_parties.csv", d3.autoType),
+      d3.csv("https://advaitrs.github.io/Population.csv", d3.autoType)
+    ]).then(function([data2020, data2021, data2022, data2023, partiesData, populationData]) {
       // Data is now parsed with appropriate types
       // Show the first slide by default
-      showSlide(data2020, partiesData, "2020");
-      //showSlide(data2021, partiesData, "2021");
-      showSlide(data2022, partiesData, "2022");
-      showSlide(data2023, partiesData, "2023");
+      showSlide(data2020, partiesData, populationData, "2020");
+      showSlide(data2021, partiesData, populationData, "2021");
+      showSlide(data2022, partiesData, populationData, "2022");
+      showSlide(data2023, partiesData, populationData, "2023");
     }).catch(function(error) {
       console.error("Error loading data:", error);
     });
@@ -46,7 +47,7 @@
     }
 
     // Function to show a slide for a specific year
-    function showSlide(data, partiesData, year) {
+    function showSlide(data, partiesData, populationData, year) {
 
       // Add party affiliation information to the data
       data.forEach(d => {
@@ -63,18 +64,18 @@
       const chartWidth = width - margin.left - margin.right;
       const chartHeight = height - margin.top - margin.bottom;
 
-      // Create an SVG container
+      // Create an SVG container for the bar chart
       const svg = d3.select("#chart")
         .append("svg")
         .attr("width", width)
         .attr("height", height);
-      
+
       // Set colors based on affiliation (Democratic or Republican)
       const colorScale = d3.scaleOrdinal()
         .domain(["Democratic", "Republican"])
         .range(["blue", "red"]);
 
-      // Create scales
+      // Create scales for the bar chart
       const xScale = d3.scaleBand()
         .domain(data.map(d => d.State))
         .range([0, chartWidth])
@@ -84,7 +85,7 @@
         .domain([0, d3.max(data, d => d.Cases)])
         .range([chartHeight, 0]);
 
-      // Create bars
+      // Create bars for the bar chart
       svg.selectAll("rect")
         .data(data)
         .enter()
@@ -101,7 +102,7 @@
           hideTooltip();
         });
 
-      // Add x-axis
+      // Add x-axis for the bar chart
       svg.append("g")
         .attr("transform", `translate(0, ${chartHeight})`)
         .call(d3.axisBottom(xScale))
@@ -109,16 +110,84 @@
         .attr("transform", "rotate(-45)")
         .style("text-anchor", "end");
 
-      // Add y-axis
+      // Add y-axis for the bar chart
       svg.append("g")
         .call(d3.axisLeft(yScale));
 
-      // Add a title
+      // Add a title for the bar chart
       svg.append("text")
         .attr("x", width / 2)
         .attr("y", 30)
         .attr("text-anchor", "middle")
         .text(`COVID-19 Cases by State in ${year}`);
+
+      // Create an SVG container for the correlation plot
+      const corrSvg = d3.select("#chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("display", "none");
+
+      // Extract cases and population data for the correlation plot
+      const correlationData = data.map(d => ({ cases: d.Cases, population: getPopulationByState(d.State, populationData) }));
+
+      // Calculate correlation coefficient
+      const correlation = d3.rollups(correlationData, v => d3.sum(v, d => d.cases * d.population), d => null, d => d.cases, d => d.population)
+        .map(([_, casesSum, populationSum]) => casesSum / Math.sqrt(populationSum))
+        .pop();
+
+      // Create scales for the correlation plot
+      const xCorrScale = d3.scaleLinear()
+        .domain(d3.extent(correlationData, d => d.cases))
+        .range([margin.left, chartWidth - margin.right]);
+
+      const yCorrScale = d3.scaleLinear()
+        .domain(d3.extent(correlationData, d => d.population))
+        .range([chartHeight - margin.bottom, margin.top]);
+
+      // Create dots for the correlation plot
+      corrSvg.selectAll("circle")
+        .data(correlationData)
+        .enter()
+        .append("circle")
+        .attr("cx", d => xCorrScale(d.cases))
+        .attr("cy", d => yCorrScale(d.population))
+        .attr("r", 3)
+        .attr("fill", "black")
+        .on("mouseover", function(event, d) {
+          showTooltip(`Cases: ${d.cases}, Population: ${d.population}`);
+        })
+        .on("mouseout", function() {
+          hideTooltip();
+        });
+
+      // Add x-axis for the correlation plot
+      corrSvg.append("g")
+        .attr("transform", `translate(0, ${chartHeight - margin.bottom})`)
+        .call(d3.axisBottom(xCorrScale));
+
+      // Add y-axis for the correlation plot
+      corrSvg.append("g")
+        .attr("transform", `translate(${margin.left}, 0)`)
+        .call(d3.axisLeft(yCorrScale));
+
+      // Add correlation coefficient text
+      corrSvg.append("text")
+        .attr("x", width / 2)
+        .attr("y", margin.top)
+        .attr("text-anchor", "middle")
+        .text(`Correlation: ${correlation.toFixed(2)}`);
+
+      // Show the correlation plot for the current year
+      if (currentSlideIndex === year - 2020) {
+        corrSvg.style("display", "block");
+      }
+
+      // Helper function to get the population by state
+      function getPopulationByState(state, data) {
+        const populationInfo = data.find(d => d.State === state);
+        return populationInfo ? populationInfo.Population : 0;
+      }
     }
 
     // Function to show the current slide based on the index
@@ -127,7 +196,8 @@
       d3.selectAll("#chart > svg").style("display", "none");
 
       // Show the current slide
-      d3.select(`#chart > svg:nth-child(${currentSlideIndex + 1})`).style("display", "block");
+      d3.select(`#chart > svg:nth-child(${currentSlideIndex * 2 + 1})`).style("display", "block");
+      d3.select(`#chart > svg:nth-child(${currentSlideIndex * 2 + 2})`).style("display", "block");
     }
 
     // Function to go to the next slide
